@@ -1,6 +1,12 @@
-from copy import deepcopy
-from dahuffman import HuffmanCodec
 import json
+from dahuffman import HuffmanCodec
+from copy import deepcopy
+
+ENCODE_ENDIAN = 'big'
+HUFFMAN_TABLE_BYTE_LENGTH = 4
+RESULT_BYTE_LENGTH = 8
+SPLIT_LENGTH = 8
+
 
 mp = {'A': '00', 'T': '01', 'C': '10', 'G': '11'}
 rmp = {}
@@ -17,8 +23,10 @@ def dnaToBase4(dna: str) -> str:
     return len(dna), r
 
 
-def encodeHuffman(dataIn: str):  # -> tuple(int, bytes):
-    for splitLen in range(8):
+def encodeHuffman(dataIn: str) -> bytes:
+    minResultLen = None
+    result = None
+    for splitLen in range(SPLIT_LENGTH):
         splitLen += 1
         tmp = [int(dataIn[idx:idx+splitLen], 2)
                for idx in range(0, len(dataIn), splitLen)]
@@ -29,10 +37,14 @@ def encodeHuffman(dataIn: str):  # -> tuple(int, bytes):
             else:
                 huffmanFreq[i] = 1
 
-        decodeTable = json.dumps(huffmanFreq).encode('ascii')
+        huffmanTable = json.dumps(huffmanFreq).encode('ascii')
         codec = HuffmanCodec.from_frequencies(
             {chr(k): v for (k, v) in huffmanFreq.items()})
         result = codec.encode(''.join([chr(i) for i in tmp]))
-        encodeString = len(decodeTable).to_bytes(4, 'big') + \
-            decodeTable+len(result).to_bytes(8, 'big')+result
-        print(len(encodeString))
+        encodeString = len(huffmanTable).to_bytes(HUFFMAN_TABLE_BYTE_LENGTH, ENCODE_ENDIAN) + \
+            huffmanTable+len(result).to_bytes(RESULT_BYTE_LENGTH,
+                                              ENCODE_ENDIAN)+result
+        if minResultLen == None or len(encodeString) < minResultLen:
+            minResultLen = len(encodeString)
+            result = encodeString
+    return encodeString
