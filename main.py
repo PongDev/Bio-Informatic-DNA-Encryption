@@ -1,11 +1,29 @@
+"""
+Output File Structure
+
+MetaData
+    Name
+    SubDNACount
+    SubDNALengthArray
+DNA (Combine of all DNA)
+    EncodingTableLength
+    EncodingDNALength
+    SplitLength
+    ZeroFillLength
+    EncodingTable
+    EncodingDNA
+"""
+
 import json
 from dahuffman import HuffmanCodec
-from copy import deepcopy
+from numpy import base_repr as intToBaseStr
 
 ENCODE_ENDIAN = 'big'
 HUFFMAN_TABLE_BYTE_LENGTH = 4
-RESULT_BYTE_LENGTH = 8
+ENCODE_BYTE_LENGTH = 8
 SPLIT_LENGTH = 8
+SPLIT_BYTE_LENGTH = 1  # Require at least log2 of max SPLIT_LENGTH bit
+ZEROFILL_BYTE_LENGTH = 1  # Require at least log2 of max SPLIT_LENGTH bit
 
 
 mp = {'A': '00', 'T': '01', 'C': '10', 'G': '11'}
@@ -20,7 +38,37 @@ def dnaToBase4(dna: str) -> str:
 
     for i in dna:
         r += mp[i]
-    return len(dna), r
+    return r
+
+
+def base4ToDNA(base4: str) -> str:
+    dna = ''.join([rmp[base4[idx:idx+2]] for idx in range(0, len(base4), 2)])
+    return dna
+
+
+def decodeHuffman(dataIn: bytes) -> str:
+    huffmanTableLength = int.from_bytes(
+        dataIn[0:HUFFMAN_TABLE_BYTE_LENGTH], ENCODE_ENDIAN)
+    offset = HUFFMAN_TABLE_BYTE_LENGTH
+    encodeLength = int.from_bytes(
+        dataIn[offset:offset+ENCODE_BYTE_LENGTH], ENCODE_ENDIAN)
+    offset += ENCODE_BYTE_LENGTH
+    splitLen = int.from_bytes(
+        dataIn[offset:offset+SPLIT_BYTE_LENGTH], ENCODE_ENDIAN)
+    offset += SPLIT_BYTE_LENGTH
+    zeroFill = int.from_bytes(
+        dataIn[offset:offset+ZEROFILL_BYTE_LENGTH], ENCODE_ENDIAN)
+    offset += ZEROFILL_BYTE_LENGTH
+    huffmanFreq = json.loads(dataIn[offset:offset+huffmanTableLength])
+    codec = HuffmanCodec.from_frequencies(
+        {chr(int(k)): v for (k, v) in huffmanFreq.items()})
+    offset += huffmanTableLength
+    encodeData = dataIn[offset:offset+encodeLength]
+    decodeData = codec.decode(encodeData)
+    decodeData = ''.join([intToBaseStr(ord(i), base=2).zfill(splitLen)
+                          for i in decodeData])
+    decodeData = decodeData[:-zeroFill]
+    return decodeData
 
 
 def encodeHuffman(dataIn: str) -> bytes:
@@ -28,8 +76,9 @@ def encodeHuffman(dataIn: str) -> bytes:
     result = None
     for splitLen in range(SPLIT_LENGTH):
         splitLen += 1
-        tmp = [int(dataIn[idx:idx+splitLen], 2)
+        tmp = [int(dataIn[idx:idx+splitLen].ljust(splitLen, '0'), 2)
                for idx in range(0, len(dataIn), splitLen)]
+        zeroFill = SPLIT_LENGTH-(len(dataIn) % SPLIT_LENGTH)
         huffmanFreq: dict = {}
         for i in tmp:
             if i in huffmanFreq:
@@ -42,9 +91,22 @@ def encodeHuffman(dataIn: str) -> bytes:
             {chr(k): v for (k, v) in huffmanFreq.items()})
         result = codec.encode(''.join([chr(i) for i in tmp]))
         encodeString = len(huffmanTable).to_bytes(HUFFMAN_TABLE_BYTE_LENGTH, ENCODE_ENDIAN) + \
-            huffmanTable+len(result).to_bytes(RESULT_BYTE_LENGTH,
-                                              ENCODE_ENDIAN)+result
+            len(result).to_bytes(ENCODE_BYTE_LENGTH, ENCODE_ENDIAN) + \
+            splitLen.to_bytes(SPLIT_BYTE_LENGTH, ENCODE_ENDIAN) + \
+            zeroFill.to_bytes(ZEROFILL_BYTE_LENGTH, ENCODE_ENDIAN) + \
+            huffmanTable + result
         if minResultLen == None or len(encodeString) < minResultLen:
             minResultLen = len(encodeString)
             result = encodeString
     return encodeString
+
+
+tmp = dnaToBase4(input())
+print(tmp)
+print()
+encodeData = encodeHuffman(tmp)
+print(encodeData)
+print()
+decodeData = decodeHuffman(encodeData)
+print(decodeData)
+print(base4ToDNA(decodeData))
