@@ -1,6 +1,9 @@
 """
 Output File Structure
 
+Header
+AES encryption key encrypt with RSA
+---------- Encrypt with AES ----------
 MetaData
     Name
     SubDNACount
@@ -17,6 +20,8 @@ DNA (Combine of all DNA)
 import json
 from dahuffman import HuffmanCodec
 from numpy import base_repr as intToBaseStr
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
 
 ENCODE_ENDIAN = 'big'
 HUFFMAN_TABLE_BYTE_LENGTH = 4
@@ -101,12 +106,58 @@ def encodeHuffman(dataIn: str) -> bytes:
     return encodeString
 
 
-tmp = dnaToBase4(input())
+def GenerateAES16BytesKey() -> bytes:
+    return get_random_bytes(16)
+
+
+def AESEncryption(data: bytes, key16Bytes: bytes) -> bytes:
+    cipher = AES.new(key16Bytes, AES.MODE_EAX)
+    nonce = cipher.nonce  # 16 bytes random nonce
+    encryptData, tag = cipher.encrypt_and_digest(data)  # 16 bytes tag
+    return nonce + tag + encryptData
+
+
+def AESDecryption(encryptData: bytes, key16Bytes: bytes) -> bytes:
+    nonce = encryptData[0:16]
+    tag = encryptData[16:32]
+    encryptData = encryptData[32:]
+    cipher = AES.new(key16Bytes, AES.MODE_EAX, nonce=nonce)
+    decryptData = cipher.decrypt(encryptData)
+    try:
+        cipher.verify(tag)
+        return decryptData
+    except:
+        return bytes()
+
+
+test = b'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+print(test)
+print()
+key = GenerateAES16BytesKey()
+print(key)
+print()
+etest = AESEncryption(test, key)
+print(etest)
+print()
+dtest = AESDecryption(etest, key)
+print(dtest)
+print()
+print(len(test), len(etest), len(dtest))
+exit()
+inputData = input()
+tmp = dnaToBase4(inputData)
+print("Base 4 DNA")
 print(tmp)
 print()
 encodeData = encodeHuffman(tmp)
+print("Encode Data")
 print(encodeData)
 print()
 decodeData = decodeHuffman(encodeData)
+print("Decode Data")
 print(decodeData)
+print()
+print("Decode Base 4 to DNA")
 print(base4ToDNA(decodeData))
+print(len(inputData))
+print(len(encodeData))
