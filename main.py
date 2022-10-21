@@ -20,8 +20,9 @@ DNA (Combine of all DNA)
 import json
 from dahuffman import HuffmanCodec
 from numpy import base_repr as intToBaseStr
-from Crypto.Cipher import AES
+from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes
+from Crypto.PublicKey import RSA
 
 ENCODE_ENDIAN = 'big'
 HUFFMAN_TABLE_BYTE_LENGTH = 4
@@ -29,6 +30,10 @@ ENCODE_BYTE_LENGTH = 8
 SPLIT_LENGTH = 8
 SPLIT_BYTE_LENGTH = 1  # Require at least log2 of max SPLIT_LENGTH bit
 ZEROFILL_BYTE_LENGTH = 1  # Require at least log2 of max SPLIT_LENGTH bit
+
+# Must be 16 for AES-128 / 24 for AES-192 / 32 for AES-256
+AES_ENCRYPTION_KEY_LENGTH = 32
+RSA_KEY_LENGTH = 2048
 
 
 mp = {'A': '00', 'T': '01', 'C': '10', 'G': '11'}
@@ -106,22 +111,22 @@ def encodeHuffman(dataIn: str) -> bytes:
     return encodeString
 
 
-def GenerateAES16BytesKey() -> bytes:
-    return get_random_bytes(16)
+def GenerateAESKey() -> bytes:
+    return get_random_bytes(AES_ENCRYPTION_KEY_LENGTH)
 
 
-def AESEncryption(data: bytes, key16Bytes: bytes) -> bytes:
-    cipher = AES.new(key16Bytes, AES.MODE_EAX)
+def AESEncryption(data: bytes, key: bytes) -> bytes:
+    cipher = AES.new(key, AES.MODE_EAX)
     nonce = cipher.nonce  # 16 bytes random nonce
     encryptData, tag = cipher.encrypt_and_digest(data)  # 16 bytes tag
     return nonce + tag + encryptData
 
 
-def AESDecryption(encryptData: bytes, key16Bytes: bytes) -> bytes:
+def AESDecryption(encryptData: bytes, key: bytes) -> bytes:
     nonce = encryptData[0:16]
     tag = encryptData[16:32]
     encryptData = encryptData[32:]
-    cipher = AES.new(key16Bytes, AES.MODE_EAX, nonce=nonce)
+    cipher = AES.new(key, AES.MODE_EAX, nonce=nonce)
     decryptData = cipher.decrypt(encryptData)
     try:
         cipher.verify(tag)
@@ -130,16 +135,35 @@ def AESDecryption(encryptData: bytes, key16Bytes: bytes) -> bytes:
         return bytes()
 
 
+def RSAEncryption(data: bytes, keyPath: str) -> bytes:
+    publicKey = RSA.import_key(open(keyPath).read())
+    sessionKey = GenerateAESKey()
+    encryptData = AESEncryption(data, sessionKey)
+    cipherRSA = PKCS1_OAEP.new(publicKey)
+    encryptSessionKey = cipherRSA.encrypt(
+        sessionKey)  # RSA_KEY_LENGTH / 8 Bytes Long
+    return encryptSessionKey + encryptData
+
+
+def RSADecryption(encryptData: bytes, keyPath: str) -> bytes:
+    privateKey = RSA.import_key(open(keyPath).read())
+    offset = RSA_KEY_LENGTH//8
+    encryptSessionKey = encryptData[0:offset]
+    encryptData = encryptData[offset:]
+    cipherRSA = PKCS1_OAEP.new(privateKey)
+    sessionKey = cipherRSA.decrypt(encryptSessionKey)
+    data = AESDecryption(encryptData, sessionKey)
+    return data
+
+
 test = b'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 print(test)
 print()
-key = GenerateAES16BytesKey()
-print(key)
-print()
-etest = AESEncryption(test, key)
+etest = RSAEncryption(test, 'public.key')
 print(etest)
 print()
-dtest = AESDecryption(etest, key)
+
+dtest = RSADecryption(etest, 'private.key')
 print(dtest)
 print()
 print(len(test), len(etest), len(dtest))
