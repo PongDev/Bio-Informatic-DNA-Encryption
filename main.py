@@ -23,10 +23,12 @@ from numpy import base_repr as intToBaseStr
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 from Crypto.PublicKey import RSA
+import sys
 
 ENCODE_ENDIAN = 'big'
 HUFFMAN_TABLE_BYTE_LENGTH = 4
 ENCODE_BYTE_LENGTH = 8
+MAX_DATA_BYTE_LENGTH = 8
 SPLIT_LENGTH = 8
 SPLIT_BYTE_LENGTH = 1  # Require at least log2 of max SPLIT_LENGTH bit
 ZEROFILL_BYTE_LENGTH = 1  # Require at least log2 of max SPLIT_LENGTH bit
@@ -156,32 +158,113 @@ def RSADecryption(encryptData: bytes, keyPath: str) -> bytes:
     return data
 
 
-test = b'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-print(test)
-print()
-etest = RSAEncryption(test, 'public.key')
-print(etest)
-print()
+def ReadFasta(filePath: str) -> list:
+    r = []
 
-dtest = RSADecryption(etest, 'private.key')
-print(dtest)
-print()
-print(len(test), len(etest), len(dtest))
-exit()
-inputData = input()
-tmp = dnaToBase4(inputData)
-print("Base 4 DNA")
-print(tmp)
-print()
-encodeData = encodeHuffman(tmp)
-print("Encode Data")
-print(encodeData)
-print()
-decodeData = decodeHuffman(encodeData)
-print("Decode Data")
-print(decodeData)
-print()
-print("Decode Base 4 to DNA")
-print(base4ToDNA(decodeData))
-print(len(inputData))
-print(len(encodeData))
+    dnaName = None
+    dnaStr = ""
+    with open(filePath, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line[0] == '>':
+                if dnaName != None and dnaStr != "":
+                    r.append((dnaName, dnaStr))
+                dnaName = line[1:]
+                dnaStr = ""
+            else:
+                dnaStr += line
+        if dnaName != None and dnaStr != "":
+            r.append((dnaName, dnaStr))
+    return r
+
+
+def WriteFasta(filePath: str, fastaList: list) -> None:
+    with open(filePath, 'w') as f:
+        for dnaName, dnaStr in fastaList:
+            f.write(f">{dnaName}\n{dnaStr}\n")
+
+
+def EncryptFasta(fastaList: list, keyPath: str) -> bytes:
+    r = bytes()
+    metaData = []
+    allDNAStr = ""
+    for dnaName, dnaStr in fastaList:
+        metaData.append((dnaName, len(dnaStr)))
+        allDNAStr += dnaStr
+    metaDataBytes = json.dumps(metaData).encode('ascii')
+    allDNAStr = bytes(allDNAStr, 'ascii')
+    encryptMetaData = RSAEncryption(metaDataBytes, keyPath)
+    encryptDNAStr = RSAEncryption(allDNAStr, keyPath)
+    r += len(encryptMetaData).to_bytes(MAX_DATA_BYTE_LENGTH, ENCODE_ENDIAN) + \
+        len(encryptDNAStr).to_bytes(MAX_DATA_BYTE_LENGTH, ENCODE_ENDIAN) + \
+        encryptMetaData + encryptDNAStr
+    return r
+
+
+def DecryptFasta(encryptData: bytes, keyPath: str) -> list:
+    r = []
+    encryptMetaDataLen = int.from_bytes(
+        encryptData[:MAX_DATA_BYTE_LENGTH], ENCODE_ENDIAN)
+    offset = MAX_DATA_BYTE_LENGTH
+    encryptDNADataLen = int.from_bytes(
+        encryptData[offset:offset+MAX_DATA_BYTE_LENGTH], ENCODE_ENDIAN)
+    offset += MAX_DATA_BYTE_LENGTH
+    encryptMetaData = encryptData[offset:offset+encryptMetaDataLen]
+    offset += encryptMetaDataLen
+    encryptDNAData = encryptData[offset:offset+encryptDNADataLen]
+    metaData = RSADecryption(encryptMetaData, keyPath)
+    dnaData = RSADecryption(encryptDNAData, keyPath)
+    metaData = json.loads(metaData)
+    offset = 0
+    for dnaName, dnaLen in metaData:
+        r.append((dnaName, dnaData[offset:offset+dnaLen].decode('ascii')))
+        offset += dnaLen
+    return r
+
+
+def main(mode=None, filePath=None, rsaKeyPath=None, outputPath=None):
+    while mode not in ["e", "d"]:
+        mode = input(
+            'Enter "e" for encrypt "d" for decrypt\n[e/d]: ').lower()[0]
+    if mode == "e":
+        print("Encrypt Mode")
+        if filePath == None:
+            filePath = input("Enter Filepath to Encrypt: ")
+        if rsaKeyPath == None:
+            rsaKeyPath = input("Enter RSA Public Key Filepath: ")
+        if outputPath == None:
+            outputPath = input("Enter Output Filepath: ")
+        fastaList = ReadFasta(filePath)
+        encryptData = EncryptFasta(fastaList, rsaKeyPath)
+        with open(outputPath, "wb") as f:
+            f.write(encryptData)
+        print("Complete Encrypt Data")
+    elif mode == "d":
+        print("Decrypt Mode")
+        if filePath == None:
+            filePath = input("Enter Filepath to Decrypt: ")
+        if rsaKeyPath == None:
+            rsaKeyPath = input("Enter RSA Private Key Filepath: ")
+        if outputPath == None:
+            outputPath = input("Enter Output Filepath: ")
+        encryptData = None
+        with open(filePath, "rb") as f:
+            encryptData = f.read()
+        data = DecryptFasta(encryptData, rsaKeyPath)
+        WriteFasta(outputPath, data)
+        print("Complete Decrypt Data")
+
+
+mode = None
+filePath = None
+rsaKeyPath = None
+outputPath = None
+if len(sys.argv) > 1:
+    mode = sys.argv[1]
+if len(sys.argv) > 2:
+    filePath = sys.argv[2]
+if len(sys.argv) > 3:
+    rsaKeyPath = sys.argv[3]
+if len(sys.argv) > 4:
+    outputPath = sys.argv[4]
+main(mode, filePath, rsaKeyPath, outputPath)
