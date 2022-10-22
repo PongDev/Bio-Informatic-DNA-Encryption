@@ -24,6 +24,8 @@ from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes
 from Crypto.PublicKey import RSA
 import sys
+from stegano import lsb
+import base64
 
 ENCODE_ENDIAN = 'big'
 HUFFMAN_TABLE_BYTE_LENGTH = 4
@@ -36,6 +38,9 @@ ZEROFILL_BYTE_LENGTH = 1  # Require at least log2 of max SPLIT_LENGTH bit
 # Must be 16 for AES-128 / 24 for AES-192 / 32 for AES-256
 AES_ENCRYPTION_KEY_LENGTH = 32
 RSA_KEY_LENGTH = 2048
+
+TEMPLATE_IMAGE = "template.png"
+TEMPLATE_IMAGE_FORMAT = "png"
 
 
 mp = {'A': '00', 'T': '01', 'C': '10', 'G': '11'}
@@ -242,8 +247,9 @@ def main(mode=None, filePath=None, rsaKeyPath=None, outputPath=None):
             outputPath = input("Enter Output Filepath: ")
         fastaList = ReadFasta(filePath)
         encryptData = EncryptFasta(fastaList, rsaKeyPath)
-        with open(outputPath, "wb") as f:
-            f.write(encryptData)
+        image = lsb.hide(TEMPLATE_IMAGE, base64.b64encode(
+            encryptData).decode('ascii'))
+        image.save(outputPath, format=TEMPLATE_IMAGE_FORMAT)
         print("Complete Encrypt Data")
     elif mode == "d":
         print("Decrypt Mode")
@@ -254,8 +260,7 @@ def main(mode=None, filePath=None, rsaKeyPath=None, outputPath=None):
         if outputPath == None:
             outputPath = input("Enter Output Filepath: ")
         encryptData = None
-        with open(filePath, "rb") as f:
-            encryptData = f.read()
+        encryptData = base64.b64decode(lsb.reveal(filePath) + '==')
         data = DecryptFasta(encryptData, rsaKeyPath)
         WriteFasta(outputPath, data)
         print("Complete Decrypt Data")
