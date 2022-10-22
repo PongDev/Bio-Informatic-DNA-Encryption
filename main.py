@@ -194,7 +194,7 @@ def EncryptFasta(fastaList: list, keyPath: str) -> bytes:
         metaData.append((dnaName, len(dnaStr)))
         allDNAStr += dnaStr
     metaDataBytes = json.dumps(metaData).encode('ascii')
-    allDNAStr = bytes(allDNAStr, 'ascii')
+    allDNAStr = encodeHuffman(dnaToBase4(allDNAStr))
     encryptMetaData = RSAEncryption(metaDataBytes, keyPath)
     encryptDNAStr = RSAEncryption(allDNAStr, keyPath)
     r += len(encryptMetaData).to_bytes(MAX_DATA_BYTE_LENGTH, ENCODE_ENDIAN) + \
@@ -216,10 +216,11 @@ def DecryptFasta(encryptData: bytes, keyPath: str) -> list:
     encryptDNAData = encryptData[offset:offset+encryptDNADataLen]
     metaData = RSADecryption(encryptMetaData, keyPath)
     dnaData = RSADecryption(encryptDNAData, keyPath)
+    dnaData = base4ToDNA(decodeHuffman(dnaData))
     metaData = json.loads(metaData)
     offset = 0
     for dnaName, dnaLen in metaData:
-        r.append((dnaName, dnaData[offset:offset+dnaLen].decode('ascii')))
+        r.append((dnaName, dnaData[offset:offset+dnaLen]))
         offset += dnaLen
     return r
 
