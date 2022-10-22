@@ -79,7 +79,8 @@ def decodeHuffman(dataIn: bytes) -> str:
     decodeData = codec.decode(encodeData)
     decodeData = ''.join([intToBaseStr(ord(i), base=2).zfill(splitLen)
                           for i in decodeData])
-    decodeData = decodeData[:-zeroFill]
+    if zeroFill != 0:
+        decodeData = decodeData[:-zeroFill]
     return decodeData
 
 
@@ -90,7 +91,9 @@ def encodeHuffman(dataIn: str) -> bytes:
         splitLen += 1
         tmp = [int(dataIn[idx:idx+splitLen].ljust(splitLen, '0'), 2)
                for idx in range(0, len(dataIn), splitLen)]
-        zeroFill = SPLIT_LENGTH-(len(dataIn) % SPLIT_LENGTH)
+        zeroFill = 0
+        if len(dataIn) % SPLIT_LENGTH != 0:
+            zeroFill = SPLIT_LENGTH-(len(dataIn) % SPLIT_LENGTH)
         huffmanFreq: dict = {}
         for i in tmp:
             if i in huffmanFreq:
