@@ -166,6 +166,8 @@ def ReadFasta(filePath: str) -> list:
     with open(filePath, 'r') as f:
         for line in f:
             line = line.strip()
+            if len(line) == 0:
+                continue
             if line[0] == '>':
                 if dnaName != None and dnaStr != "":
                     r.append((dnaName, dnaStr))
