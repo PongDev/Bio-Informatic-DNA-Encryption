@@ -6,6 +6,10 @@
 ## Installation
 `pip install -r requirements.txt`
 
+## Configuration
+- copy .env.template and rename to .env
+- configuration according to .env file
+
 ## Usage
 `python3 main.py`
 
