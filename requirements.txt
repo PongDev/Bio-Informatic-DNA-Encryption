@@ -2,3 +2,4 @@ dahuffman
 numpy
 pycryptodome
 stegano
+python-dotenv

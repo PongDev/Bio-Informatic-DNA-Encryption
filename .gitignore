@@ -1,3 +1,5 @@
 *.fasta
 *.key
 *.png
+.env
+**/__pycache__/
