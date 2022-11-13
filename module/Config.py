@@ -8,10 +8,10 @@ ENCODE_ENDIAN = os.getenv('ENCODE_ENDIAN')
 HUFFMAN_TABLE_BYTE_LENGTH = int(os.getenv('HUFFMAN_TABLE_BYTE_LENGTH'))
 ENCODE_BYTE_LENGTH = int(os.getenv('ENCODE_BYTE_LENGTH'))
 MAX_DATA_BYTE_LENGTH = int(os.getenv('MAX_DATA_BYTE_LENGTH'))
-SPLIT_LENGTH = int(os.getenv('SPLIT_LENGTH'))
+MAX_SPLIT_LENGTH = int(os.getenv('MAX_SPLIT_LENGTH'))
 
 # Require at least log2 of max SPLIT_LENGTH bit
-SPLIT_BYTE_LENGTH = int(os.getenv('SPLIT_BYTE_LENGTH'))
+MAX_SPLIT_BYTE_LENGTH = int(os.getenv('MAX_SPLIT_BYTE_LENGTH'))
 
 # Require at least log2 of max SPLIT_LENGTH bit
 ZEROFILL_BYTE_LENGTH = int(os.getenv('ZEROFILL_BYTE_LENGTH'))

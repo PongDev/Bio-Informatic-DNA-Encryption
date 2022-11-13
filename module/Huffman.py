@@ -1,7 +1,7 @@
 from dahuffman import HuffmanCodec
 from numpy import base_repr as intToBaseStr
 import json
-from .Config import HUFFMAN_TABLE_BYTE_LENGTH, ENCODE_ENDIAN, ENCODE_BYTE_LENGTH, SPLIT_LENGTH, SPLIT_BYTE_LENGTH, ZEROFILL_BYTE_LENGTH
+from .Config import HUFFMAN_TABLE_BYTE_LENGTH, ENCODE_ENDIAN, ENCODE_BYTE_LENGTH, MAX_SPLIT_LENGTH, MAX_SPLIT_BYTE_LENGTH, ZEROFILL_BYTE_LENGTH
 
 
 def decodeHuffman(dataIn: bytes) -> str:
@@ -12,8 +12,8 @@ def decodeHuffman(dataIn: bytes) -> str:
         dataIn[offset:offset+ENCODE_BYTE_LENGTH], ENCODE_ENDIAN)
     offset += ENCODE_BYTE_LENGTH
     splitLen = int.from_bytes(
-        dataIn[offset:offset+SPLIT_BYTE_LENGTH], ENCODE_ENDIAN)
-    offset += SPLIT_BYTE_LENGTH
+        dataIn[offset:offset+MAX_SPLIT_BYTE_LENGTH], ENCODE_ENDIAN)
+    offset += MAX_SPLIT_BYTE_LENGTH
     zeroFill = int.from_bytes(
         dataIn[offset:offset+ZEROFILL_BYTE_LENGTH], ENCODE_ENDIAN)
     offset += ZEROFILL_BYTE_LENGTH
@@ -32,14 +32,14 @@ def decodeHuffman(dataIn: bytes) -> str:
 
 def encodeHuffman(dataIn: str) -> bytes:
     minResultLen = None
-    result = None
-    for splitLen in range(SPLIT_LENGTH):
+    minResult = None
+    for splitLen in range(MAX_SPLIT_LENGTH):
         splitLen += 1
         tmp = [int(dataIn[idx:idx+splitLen].ljust(splitLen, '0'), 2)
                for idx in range(0, len(dataIn), splitLen)]
         zeroFill = 0
-        if len(dataIn) % SPLIT_LENGTH != 0:
-            zeroFill = SPLIT_LENGTH-(len(dataIn) % SPLIT_LENGTH)
+        if len(dataIn) % splitLen != 0:
+            zeroFill = splitLen-(len(dataIn) % splitLen)
         huffmanFreq: dict = {}
         for i in tmp:
             if i in huffmanFreq:
@@ -53,10 +53,10 @@ def encodeHuffman(dataIn: str) -> bytes:
         result = codec.encode(''.join([chr(i) for i in tmp]))
         encodeString = len(huffmanTable).to_bytes(HUFFMAN_TABLE_BYTE_LENGTH, ENCODE_ENDIAN) + \
             len(result).to_bytes(ENCODE_BYTE_LENGTH, ENCODE_ENDIAN) + \
-            splitLen.to_bytes(SPLIT_BYTE_LENGTH, ENCODE_ENDIAN) + \
+            splitLen.to_bytes(MAX_SPLIT_BYTE_LENGTH, ENCODE_ENDIAN) + \
             zeroFill.to_bytes(ZEROFILL_BYTE_LENGTH, ENCODE_ENDIAN) + \
             huffmanTable + result
         if minResultLen == None or len(encodeString) < minResultLen:
             minResultLen = len(encodeString)
-            result = encodeString
-    return encodeString
+            minResult = encodeString
+    return minResult
