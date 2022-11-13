@@ -71,19 +71,20 @@ def main(mode=None, filePath=None, rsaKeyPath=None, outputPath=None, processAsIm
         print("Complete Decrypt Data")
 
 
-mode = None
-filePath = None
-rsaKeyPath = None
-outputPath = None
-processAsImage = None
-if len(sys.argv) > 1:
-    mode = sys.argv[1]
-if len(sys.argv) > 2:
-    filePath = sys.argv[2]
-if len(sys.argv) > 3:
-    rsaKeyPath = sys.argv[3]
-if len(sys.argv) > 4:
-    outputPath = sys.argv[4]
-if len(sys.argv) > 5:
-    processAsImage = sys.argv[5].strip().lower() == "true"
-main(mode, filePath, rsaKeyPath, outputPath, processAsImage)
+if __name__ == "__main__":
+    mode = None
+    filePath = None
+    rsaKeyPath = None
+    outputPath = None
+    processAsImage = None
+    if len(sys.argv) > 1:
+        mode = sys.argv[1]
+    if len(sys.argv) > 2:
+        filePath = sys.argv[2]
+    if len(sys.argv) > 3:
+        rsaKeyPath = sys.argv[3]
+    if len(sys.argv) > 4:
+        outputPath = sys.argv[4]
+    if len(sys.argv) > 5:
+        processAsImage = sys.argv[5].strip().lower() == "true"
+    main(mode, filePath, rsaKeyPath, outputPath, processAsImage)
